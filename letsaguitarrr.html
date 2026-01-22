@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Let's-a-Guitarrr 1.0.0</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (JSX -> JS 변환) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'] },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* 커스텀 스크롤바 & 유틸리티 */
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 20px; }
+        .tuner-needle { transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1); }
+        body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #3b82f6; margin-top: -6px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #cbd5e1; border-radius: 2px; }
+        .dark input[type=range]::-webkit-slider-runnable-track { background: #475569; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-slate-900 transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef } = React;
+
+        // --- Inline Icons (Lucide Replacements) ---
+        const Icon = ({ children, size = 24, className = "", ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
+        );
+
+        const Activity = (p) => <Icon {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></Icon>; 
+        const ActivityIcon = Activity; 
+        const SlidersIcon = (p) => <Icon {...p}><line x1="4" x2="4" y1="21" y2="14" /><line x1="4" x2="4" y1="10" y2="3" /><line x1="12" x2="12" y1="21" y2="12" /><line x1="12" x2="12" y1="8" y2="3" /><line x1="20" x2="20" y1="21" y2="16" /><line x1="20" x2="20" y1="12" y2="3" /><line x1="2" x2="6" y1="14" y2="14" /><line x1="10" x2="14" y1="8" y2="8" /><line x1="18" x2="22" y1="16" y2="16" /></Icon>;
+        const HashIcon = (p) => <Icon {...p}><line x1="4" x2="20" y1="9" y2="9" /><line x1="4" x2="20" y1="15" y2="15" /><line x1="10" x2="8" y1="3" y2="21" /><line x1="16" x2="14" y1="3" y2="21" /></Icon>;
+        const TypeIcon = (p) => <Icon {...p}><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" x2="15" y1="20" y2="20" /><line x1="12" x2="12" y1="4" y2="20" /></Icon>;
+        const PaletteIcon = (p) => <Icon {...p}><circle cx="13.5" cy="6.5" r=".5" /><circle cx="17.5" cy="10.5" r=".5" /><circle cx="8.5" cy="7.5" r=".5" /><circle cx="6.5" cy="12.5" r=".5" /><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" /></Icon>;
+        const SunIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></Icon>;
+        const MoonIcon = (p) => <Icon {...p}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></Icon>;
+        const Square = (p) => <Icon {...p}><rect width="18" height="18" x="3" y="3" rx="2" /></Icon>; 
+        const Play = (p) => <Icon {...p}><polygon points="5 3 19 12 5 21 5 3" /></Icon>; 
+        const Plus = (p) => <Icon {...p}><path d="M5 12h14" /><path d="M12 5v14" /></Icon>; 
+        const Minus = (p) => <Icon {...p}><path d="M5 12h14" /></Icon>; 
+        const RotateCcwIcon = (p) => <Icon {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></Icon>;
+        const Music2Icon = (p) => <Icon {...p}><circle cx="8" cy="18" r="4" /><path d="M12 18V2l7 4" /></Icon>;
+        const BookOpenIcon = (p) => <Icon {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></Icon>;
+        const GraduationCapIcon = (p) => <Icon {...p}><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></Icon>;
+        const ChevronUpIcon = (p) => <Icon {...p}><path d="m18 15-6-6-6 6" /></Icon>;
+        const ChevronDownIcon = (p) => <Icon {...p}><path d="m6 9 6 6 6-6" /></Icon>;
+        const MicIcon = (p) => <Icon {...p}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></Icon>;
+        const HelpCircleIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></Icon>;
+        const HandIcon = (p) => <Icon {...p}><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></Icon>;
+        const XIcon = (p) => <span className="font-sans font-bold text-lg leading-none">✕</span>; 
+
+        // --- Constants ---
+        const NOTES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const NOTES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+        const NOTE_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+        const ACCIDENTAL_INDICES = [1, 3, 6, 8, 10]; 
+
+        const TUNING_PRESETS = {
+            'Standard': [4, 11, 7, 2, 9, 4], 'Drop D': [4, 11, 7, 2, 9, 2], 'Eb Standard': [3, 10, 6, 1, 8, 3],
+            'D Standard': [2, 9, 5, 0, 7, 2], 'Open D': [2, 9, 6, 2, 9, 2], 'Open G': [2, 11, 7, 2, 7, 2], 'DADGAD': [2, 9, 7, 2, 9, 2]
+        };
+
+        const ROOT_TO_INDEX = {
+            'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+        };
+
+        const FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'];
+
+        const INSTRUMENTS = {
+            'Guitar': {
+                label: 'Guitar',
+                strings: ['1', '2', '3', '4', '5', '6'],
+                stringSpacing: 50,
+                fretboardHeight: 320,
+                tunings: {
+                    'Standard': [4, 11, 7, 2, 9, 4], 'Drop D': [4, 11, 7, 2, 9, 2], 'Eb Standard': [3, 10, 6, 1, 8, 3],
+                    'D Standard': [2, 9, 5, 0, 7, 2], 'Open D': [2, 9, 6, 2, 9, 2], 'Open G': [2, 11, 7, 2, 7, 2], 'DADGAD': [2, 9, 7, 2, 9, 2]
+                }
+            },
+            'Bass': {
+                label: 'Bass',
+                strings: ['1', '2', '3', '4'],
+                stringSpacing: 70, 
+                fretboardHeight: 280,
+                tunings: {
+                    'Standard': [7, 2, 9, 4], 'Drop D': [7, 2, 9, 2], 'Eb Standard': [6, 1, 8, 3], '5-String Std (Low B)': [7, 2, 9, 4, 11]
+                }
+            }
+        };
+
+        const CIRCLE_OF_FIFTHS = [
+            { note: 'C',  minor: 'Am',  sig: '0',    idx: 0,  pos: 0 },
+            { note: 'G',  minor: 'Em',  sig: '1♯',   idx: 7,  pos: 1 },
+            { note: 'D',  minor: 'Bm',  sig: '2♯',   idx: 2,  pos: 2 },
+            { note: 'A',  minor: 'F#m', sig: '3♯',   idx: 9,  pos: 3 },
+            { note: 'E',  minor: 'C#m', sig: '4♯',   idx: 4,  pos: 4 },
+            { note: 'B',  display: 'B', sub: 'Cb', minor: 'G#m', sig: '5♯/7♭',   idx: 11, pos: 5 }, 
+            { note: 'F#', display: 'F#', sub: 'Gb', minor: 'D#m', sig: '6♯/6♭',   idx: 6,  pos: 6 }, 
+            { note: 'Db', display: 'Db', sub: 'C#', minor: 'Bbm', sig: '5♭/7♯',   idx: 1,  pos: 7 }, 
+            { note: 'Ab', minor: 'Fm',  sig: '4♭',   idx: 8,  pos: 8 },
+            { note: 'Eb', minor: 'Cm',  sig: '3♭',   idx: 3,  pos: 9 },
+            { note: 'Bb', minor: 'Gm',  sig: '2♭',   idx: 10, pos: 10 },
+            { note: 'F',  minor: 'Dm',  sig: '1♭',   idx: 5,  pos: 11 },
+        ];
+
+        const SCALES = {
+            'Major (Ionian)': { intervals: [0, 2, 4, 5, 7, 9, 11], description: "가장 기본. 3-4, 7-R 반음." },
+            'Minor (Aeolian)': { intervals: [0, 2, 3, 5, 7, 8, 10], description: "슬프고 서정적인 락/팝의 단조." },
+            'Major Pentatonic': { intervals: [0, 2, 4, 7, 9], description: "반음 없는 5음계. 밝고 컨트리/팝." },
+            'Minor Pentatonic': { intervals: [0, 3, 5, 7, 10], description: "록과 블루스의 핵심. 1, b3, 4, 5, b7 뼈대 구조." },
+            'Blues': { intervals: [0, 3, 5, 6, 7, 10], description: "마이너 펜타 + b5. 끈적한 블루스." },
+            'Dorian': { intervals: [0, 2, 3, 5, 7, 9, 10], description: "세련되고 펑키(Funky)한 마이너." },
+            'Mixolydian': { intervals: [0, 2, 4, 5, 7, 9, 10], description: "블루지한 메이저. 락/블루스 반주." },
+            'Phrygian': { intervals: [0, 1, 3, 5, 7, 8, 10], description: "스페인/메탈의 이국적이고 어두운 느낌." },
+            'Chromatic': { intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], description: "12음계 모든 노트." },
+        };
+
+        const INTERVAL_COLORS = {
+            'R': 'bg-red-500 text-white border-red-300 shadow-[0_0_10px_rgba(239,68,68,0.6)]',
+            'b2': 'bg-rose-900 text-rose-200 opacity-80',
+            '2': 'bg-orange-400 text-black opacity-90',
+            'b3': 'bg-yellow-400 text-black border-yellow-200 shadow-[0_0_8px_rgba(250,204,21,0.5)]',
+            '3': 'bg-yellow-500 text-black border-yellow-200 shadow-[0_0_8px_rgba(234,179,8,0.5)]',
+            '4': 'bg-green-400 text-black opacity-90',
+            'b5': 'bg-purple-600 text-white animate-pulse',
+            '5': 'bg-blue-500 text-white border-blue-300 shadow-[0_0_8px_rgba(59,130,246,0.5)]',
+            'b6': 'bg-indigo-400 text-white opacity-80',
+            '6': 'bg-cyan-500 text-black opacity-90',
+            'b7': 'bg-violet-400 text-black opacity-90',
+            '7': 'bg-fuchsia-500 text-white opacity-90',
+        };
+
+        const MONO_COLORS = {
+            'R': 'bg-gray-800 text-white border-2 border-white',
+            'default': 'bg-slate-500 text-white opacity-90',
+        };
+
+        const INTERVAL_NAMES = ['R', 'b2', '2', 'b3', '3', '4', 'b5', '5', 'b6', '6', 'b7', '7'];
+
+        const INTERVAL_DESC = {
+            'R': 'Root (근음). 코드와 스케일의 주인. 모든 것의 기준.',
+            'b2': 'Minor 2nd. 반음 차이의 극심한 긴장감. 공포/메탈.',
+            '2': 'Major 2nd. 밝고 열려있는 부드러운 화음. Sus2.',
+            'b3': 'Minor 3rd. 단3도. 슬픈 마이너(Minor) 느낌의 핵심.',
+            '3': 'Major 3rd. 장3도. 밝은 메이저(Major) 느낌의 핵심.',
+            '4': 'Perfect 4th. 완전4도. 안정적이나 3도로 가려는 성질. Sus4.',
+            'b5': 'Blue Note / Triton. 악마의 음정. 블루지한 긴장감.',
+            '5': 'Perfect 5th. 완전5도. 가장 강력하고 안정적인 협화음 (Power Chord).',
+            'b6': 'Minor 6th. 우울하고 서정적인 마이너의 색채.',
+            '6': 'Major 6th. 세련되고 펑키한 도리안 스케일의 특징.',
+            'b7': 'Minor 7th. 도미넌트7의 핵심. 블루스/재즈의 색깔.',
+            '7': 'Major 7th. 서정적이고 몽환적이며 클래식한 화음.'
+        };
+        const ORDERED_INTERVAL_KEYS = ['R', 'b2', '2', 'b3', '3', '4', 'b5', '5', 'b6', '6', 'b7', '7'];
+
+        const CHORD_LOGIC = [
+            { name: 'Major', formula: [0, 4, 7], desc: '밝고 웅장함.' },
+            { name: 'Minor', formula: [0, 3, 7], desc: '어둡고 슬픔.' },
+            { name: 'sus4', formula: [0, 5, 7], desc: '3도 대신 4도를 사용. 해결되지 않고 붕 떠있는 신비한 느낌.' },
+            { name: 'dim', formula: [0, 3, 6], desc: '불안정하게 좁혀진 음정. 공포 영화나 강한 긴장감 조성.' },
+            { name: 'aug', formula: [0, 4, 8], desc: '5도가 반음 높아짐. 꿈속을 걷는 듯한 몽환적인 불협화음.' },
+            { name: 'Dom7', formula: [0, 4, 7, 10], desc: '블루지한 긴장감. 다시 근음으로 가려는 강한 욕구.' }
+        ];
+
+        const CHORD_DEFINITIONS = [
+            { name: '', intervals: [0, 4] },
+            { name: 'm', intervals: [0, 3] },
+            { name: '5', intervals: [0, 7] },
+            { name: 'sus2', intervals: [0, 2] },
+            { name: 'sus4', intervals: [0, 5] },
+            { name: '', intervals: [0, 4, 7] },
+            { name: 'm', intervals: [0, 3, 7] },
+            { name: '5 (Power)', intervals: [0, 7, 7] },
+            { name: 'dim', intervals: [0, 3, 6] },
+            { name: 'aug', intervals: [0, 4, 8] },
+            { name: 'sus4', intervals: [0, 5, 7] },
+            { name: 'sus2', intervals: [0, 2, 7] },
+            { name: '6', intervals: [0, 4, 7, 9] },
+            { name: 'm6', intervals: [0, 3, 7, 9] },
+            { name: '6/9', intervals: [0, 4, 7, 9, 2] },
+            { name: 'Maj7', intervals: [0, 4, 7, 11] },
+            { name: 'm7', intervals: [0, 3, 7, 10] },
+            { name: '7', intervals: [0, 4, 7, 10] },
+            { name: 'm7b5', intervals: [0, 3, 6, 10] },
+            { name: 'dim7', intervals: [0, 3, 6, 9] },
+            { name: '7sus4', intervals: [0, 5, 7, 10] },
+            { name: '7#5', intervals: [0, 4, 8, 10] },
+            { name: '7b5', intervals: [0, 4, 6, 10] },
+            { name: 'Maj7b5', intervals: [0, 4, 6, 11] },
+            { name: 'mMaj7', intervals: [0, 3, 7, 11] },
+            { name: 'add9', intervals: [0, 4, 7, 2] }, 
+            { name: 'm(add9)', intervals: [0, 3, 7, 2] },
+            { name: '9', intervals: [0, 4, 7, 10, 2] },
+            { name: 'm9', intervals: [0, 3, 7, 10, 2] },
+            { name: 'Maj9', intervals: [0, 4, 7, 11, 2] },
+            { name: '9sus4', intervals: [0, 5, 7, 10, 2] },
+            { name: '9b5', intervals: [0, 4, 6, 10, 2] },
+            { name: '7b9', intervals: [0, 4, 7, 10, 1] },
+            { name: '7#9', intervals: [0, 4, 7, 10, 3] },
+            { name: '11', intervals: [0, 4, 7, 10, 2, 5] }, 
+            { name: '13', intervals: [0, 4, 7, 10, 2, 9] },
+        ];
+
+        const NUT_POS_X = 140; 
+        const FRET_WIDTH = 60;
+        const STRING_START_TOP = 35;
+
+        // --- Main Component ---
+        function GuitarSynapse() {
+            const [activeTab, setActiveTab] = useState('scale'); 
+            const [isDarkMode, setIsDarkMode] = useState(true);
+            const [isMonochrome, setIsMonochrome] = useState(false); 
+            const [forceFlat, setForceFlat] = useState(false); 
+            const [currentInstrument, setCurrentInstrument] = useState('Guitar');
+            
+            // Metronome State
+            const [isMetronomePlaying, setIsMetronomePlaying] = useState(false);
+            const [showMetronomeSettings, setShowMetronomeSettings] = useState(false);
+            const [bpm, setBpm] = useState(100);
+            const [timeSignature, setTimeSignature] = useState('4/4');
+            const [customNum, setCustomNum] = useState(4);
+            const [customDen, setCustomDen] = useState(4);
+            const [baseSubdivision, setBaseSubdivision] = useState(1);
+            const [isTriplet, setIsTriplet] = useState(false);
+            const [visualBeat, setVisualBeat] = useState('idle'); // 'idle' | 'accent' | 'beat' | 'sub'
+            const [tapTimestamps, setTapTimestamps] = useState([]);
+            
+            const audioContextRef = useRef(null);
+            const nextNoteTimeRef = useRef(0);
+            const timerIDRef = useRef(null);
+            const visualTimeoutRef = useRef(null);
+            const tickCountRef = useRef(0);
+            const isPlayingRef = useRef(false);
+            const bpmRef = useRef(bpm);
+            const customNumRef = useRef(customNum);
+            
+            const effectiveSubdivision = useMemo(() => {
+                if (isTriplet) {
+                    if (baseSubdivision === 0.25) return 0.25; 
+                    return baseSubdivision * 3;
+                }
+                return baseSubdivision;
+            }, [baseSubdivision, isTriplet]);
+            const subdivisionRef = useRef(effectiveSubdivision);
+
+            // Tuning & Scale State
+            const [tuningName, setTuningName] = useState('Standard');
+            const [currentTuning, setCurrentTuning] = useState(TUNING_PRESETS['Standard']); 
+            const [rootNote, setRootNote] = useState('C');
+            const [scaleType, setScaleType] = useState('Major (Ionian)');
+            const [displayMode, setDisplayMode] = useState('note'); 
+            const [fretCount, setFretCount] = useState(12);
+            const [focusIntervals, setFocusIntervals] = useState(new Set(['All']));
+            const [hiddenNoteIndices, setHiddenNoteIndices] = useState(new Set());
+            const [chordMarkers, setChordMarkers] = useState({}); 
+            const [analyzedChordData, setAnalyzedChordData] = useState(null);
+            const [highlightedInterval, setHighlightedInterval] = useState(null);
+            const [showHelp, setShowHelp] = useState(false);
+
+            // Tuner State
+            const [tunerData, setTunerData] = useState({ note: '-', cents: 0, freq: 0, active: false });
+            const tunerCtxRef = useRef(null);
+            const analyserRef = useRef(null);
+            const animationRef = useRef(null);
+            const lastPitchRef = useRef([]);
+
+            // --- Effects ---
+            useEffect(() => {
+                if (isDarkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [isDarkMode]);
+
+            useEffect(() => {
+                bpmRef.current = bpm;
+                customNumRef.current = customNum;
+                subdivisionRef.current = effectiveSubdivision;
+            }, [bpm, customNum, effectiveSubdivision]);
+
+            const updateCustomTimeSig = (num, den) => {
+                setCustomNum(num); setCustomDen(den); setTimeSignature(`${num}/${den}`);
+            };
+
+            useEffect(() => {
+                return () => {
+                    if (timerIDRef.current) clearTimeout(timerIDRef.current);
+                    if (visualTimeoutRef.current) clearTimeout(visualTimeoutRef.current);
+                    if (audioContextRef.current) audioContextRef.current.close();
+                    isPlayingRef.current = false;
+                    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+                };
+            }, []);
+
+            // --- Logic Methods ---
+
+            const handleTapTempo = () => {
+                const now = Date.now();
+                const newTimestamps = [...tapTimestamps, now].filter(t => now - t < 2000); 
+                
+                if (newTimestamps.length > 1) {
+                    const intervals = [];
+                    for (let i = 1; i < newTimestamps.length; i++) {
+                        intervals.push(newTimestamps[i] - newTimestamps[i-1]);
+                    }
+                    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+                    const newBpm = Math.round(60000 / avgInterval);
+                    if (newBpm >= 30 && newBpm <= 240) adjustBpm(newBpm);
+                }
+                setTapTimestamps(newTimestamps);
+            };
+
+            const toggleMetronome = () => {
+                if (isMetronomePlaying) {
+                    setIsMetronomePlaying(false);
+                    isPlayingRef.current = false;
+                    if (timerIDRef.current) clearTimeout(timerIDRef.current);
+                    if (visualTimeoutRef.current) clearTimeout(visualTimeoutRef.current);
+                    setVisualBeat('idle');
+                    tickCountRef.current = 0;
+                } else {
+                    setIsMetronomePlaying(true);
+                    isPlayingRef.current = true;
+                    if (!audioContextRef.current) {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        audioContextRef.current = new AudioContext();
+                    }
+                    if (audioContextRef.current.state === 'suspended') audioContextRef.current.resume();
+                    nextNoteTimeRef.current = audioContextRef.current.currentTime + 0.1;
+                    tickCountRef.current = 0;
+                    scheduler();
+                }
+            };
+
+            const scheduler = () => {
+                if (!isPlayingRef.current) return;
+                while (nextNoteTimeRef.current < (audioContextRef.current?.currentTime || 0) + 0.1) {
+                    scheduleNote(nextNoteTimeRef.current);
+                    nextNote();
+                }
+                timerIDRef.current = setTimeout(scheduler, 25);
+            };
+
+            const nextNote = () => {
+                const secondsPerBeat = 60.0 / bpmRef.current;
+                const currentSub = subdivisionRef.current;
+                nextNoteTimeRef.current += (secondsPerBeat / currentSub);
+                tickCountRef.current++;
+            };
+
+            const scheduleNote = (time) => {
+                if (!audioContextRef.current) return;
+                const osc = audioContextRef.current.createOscillator();
+                const gain = audioContextRef.current.createGain();
+                osc.connect(gain);
+                gain.connect(audioContextRef.current.destination);
+
+                const currentSub = subdivisionRef.current;
+                const beatsPerBar = customNumRef.current;
+                
+                let isBarStart = false, isBeatStart = false;
+                if (currentSub < 1) isBarStart = true;
+                else {
+                    const totalTicks = Math.round(beatsPerBar * currentSub);
+                    const currentTick = tickCountRef.current % totalTicks;
+                    isBarStart = currentTick === 0;
+                    isBeatStart = currentTick % currentSub === 0;
+                }
+
+                if (isBarStart) {
+                    osc.frequency.setValueAtTime(1500, time);
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(1.0, time + 0.001);
+                } else if (isBeatStart) {
+                    osc.frequency.setValueAtTime(1000, time);
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(0.6, time + 0.001);
+                } else {
+                    osc.frequency.setValueAtTime(800, time);
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(0.3, time + 0.001);
+                }
+                
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+                osc.type = 'sine';
+                osc.start(time);
+                osc.stop(time + 0.1);
+
+                const drawTime = (time - audioContextRef.current.currentTime) * 1000;
+                setTimeout(() => {
+                    if (visualTimeoutRef.current) clearTimeout(visualTimeoutRef.current);
+                    if (isBarStart) setVisualBeat('accent');
+                    else if (isBeatStart) setVisualBeat('beat');
+                    else setVisualBeat('sub');
+                    visualTimeoutRef.current = setTimeout(() => setVisualBeat('idle'), 100);
+                }, Math.max(0, drawTime));
+            };
+
+            const adjustBpm = (val) => setBpm(Math.max(0, Math.min(240, val)));
+
+            const startTuner = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    tunerCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    analyserRef.current = tunerCtxRef.current.createAnalyser();
+                    const source = tunerCtxRef.current.createMediaStreamSource(stream);
+                    source.connect(analyserRef.current);
+                    analyserRef.current.fftSize = 4096; 
+                    lastPitchRef.current = []; 
+                    updateTuner();
+                } catch (err) { alert("마이크 권한이 필요합니다."); }
+            };
+
+            const updateTuner = () => {
+                if (!analyserRef.current || !tunerCtxRef.current) return;
+                const buffer = new Float32Array(analyserRef.current.fftSize);
+                analyserRef.current.getFloatTimeDomainData(buffer);
+                const pitch = autoCorrelate(buffer, tunerCtxRef.current.sampleRate);
+                
+                if (pitch !== -1) {
+                     // Smoothed Pitch
+                     const bufferSize = 10; 
+                     lastPitchRef.current.push(pitch);
+                     if (lastPitchRef.current.length > bufferSize) lastPitchRef.current.shift();
+                     const smoothedPitch = lastPitchRef.current.reduce((a, b) => a + b, 0) / lastPitchRef.current.length;
+                     
+                     const noteData = getNoteFromPitch(smoothedPitch);
+                     setTunerData({ ...noteData, freq: smoothedPitch.toFixed(1), active: true });
+                }
+                animationRef.current = requestAnimationFrame(updateTuner);
+            };
+
+            const autoCorrelate = (buf, sampleRate) => {
+                let SIZE = buf.length;
+                let rms = 0;
+                for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+                if (Math.sqrt(rms / SIZE) < 0.01) return -1;
+                let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+                for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+                for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+                buf = buf.slice(r1, r2);
+                SIZE = buf.length;
+                let c = new Float32Array(SIZE);
+                for (let i = 0; i < SIZE; i++) for (let j = 0; j < SIZE - i; j++) c[i] = c[i] + buf[j] * buf[j + i];
+                let d = 0; while (c[d] > c[d + 1]) d++;
+                let maxval = -1, maxpos = -1;
+                for (let i = d; i < SIZE; i++) if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+                let T0 = maxpos;
+                return sampleRate / T0;
+            };
+
+            const getNoteFromPitch = (frequency) => {
+                const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
+                const midi = Math.round(noteNum) + 69;
+                const note = NOTES_SHARP[midi % 12];
+                const cents = Math.floor((noteNum - Math.round(noteNum)) * 100);
+                return { note, cents };
+            };
+
+            useEffect(() => {
+                if (activeTab !== 'tuner' && animationRef.current) cancelAnimationFrame(animationRef.current);
+            }, [activeTab]);
+
+            const currentNoteNames = useMemo(() => {
+                if (activeTab === 'chord' && forceFlat) return NOTES_FLAT;
+                return FLAT_KEYS.includes(rootNote) ? NOTES_FLAT : NOTES_SHARP;
+            }, [activeTab, forceFlat, rootNote]);
+            
+            const rootIndex = ROOT_TO_INDEX[rootNote];
+            const getNoteNameByIndex = (idx) => currentNoteNames[idx % 12];
+            const getNoteIndexAt = (strIdx, fretIdx) => (currentTuning[strIdx] + fretIdx) % 12;
+
+            const toggleFocusInterval = (invName) => {
+                setFocusIntervals(prev => {
+                    const next = new Set(prev);
+                    if (invName === 'All') return new Set(['All']);
+                    next.delete('All');
+                    if (next.has(invName)) {
+                        next.delete(invName);
+                        if (next.size === 0) next.add('All');
+                    } else next.add(invName);
+                    return next;
+                });
+            };
+
+            const getNoteAt = (strIdx, fretIdx) => {
+                const startIdx = currentTuning[strIdx];
+                const noteIdx = (startIdx + fretIdx) % 12;
+                const intervalIdx = (noteIdx - rootIndex + 12) % 12;
+                const intervalName = INTERVAL_NAMES[intervalIdx];
+                const isScaleNote = SCALES[scaleType].intervals.includes(intervalIdx);
+                return { noteName: currentNoteNames[noteIdx], intervalName, isScaleNote };
+            };
+
+            const toggleInstrument = () => {
+                const next = currentInstrument === 'Guitar' ? 'Bass' : 'Guitar';
+                setCurrentInstrument(next);
+                setTuningName('Standard');
+                setCurrentTuning(INSTRUMENTS[next].tunings['Standard']);
+                setChordMarkers({});
+                setAnalyzedChordData(null);
+            };
+
+            const handleTuningPresetChange = (name) => {
+                setTuningName(name);
+                const presets = INSTRUMENTS[currentInstrument].tunings;
+                if (name !== 'Custom' && presets[name]) setCurrentTuning(presets[name]);
+            };
+
+            const adjustStringTuning = (idx, dir) => {
+                setCurrentTuning(prev => {
+                    const next = [...prev];
+                    next[idx] = (next[idx] + dir + 12) % 12;
+                    return next;
+                });
+                setTuningName('Custom');
+            };
+
+            const toggleChordMarker = (sIdx, fIdx) => {
+                setChordMarkers(prev => {
+                    const next = { ...prev };
+                    if (next[sIdx] === fIdx) delete next[sIdx]; else next[sIdx] = fIdx;
+                    return next;
+                });
+            };
+
+            const toggleNoteVisibility = (strIdx, fretIdx) => {
+                if (activeTab !== 'scale') return;
+                const key = `${strIdx}-${fretIdx}`;
+                setHiddenNoteIndices(prev => {
+                    const next = new Set(prev);
+                    if (next.has(key)) next.delete(key); else next.add(key);
+                    return next;
+                });
+            };
+
+            const resetView = () => {
+                setFocusIntervals(new Set(['All']));
+                setHiddenNoteIndices(new Set());
+            }
+
+            useEffect(() => {
+                if (activeTab === 'chord') {
+                    const activeStrings = Object.keys(chordMarkers).map(Number).sort((a, b) => b - a);
+                    if (activeStrings.length === 0) { setAnalyzedChordData(null); return; }
+
+                    const notes = activeStrings.map(s => ({ strIdx: s, fret: chordMarkers[s], noteIdx: getNoteIndexAt(s, chordMarkers[s]) }));
+                    const pitches = [...new Set(notes.map(n => n.noteIdx))];
+                    
+                    if (pitches.length === 1) {
+                            const rIdx = pitches[0];
+                            setAnalyzedChordData({ name: getNoteNameByIndex(rIdx), rootIdx: rIdx, suffix: '', intervalMap: activeStrings.reduce((acc, s) => ({...acc, [s]: 'R'}), {}), intervals: [0] });
+                            return;
+                    }
+
+                    const bassIdx = notes[0].noteIdx;
+                    let bestMatch = null;
+
+                    for (let r of pitches) {
+                        const intervals = pitches.map(p => (p - r + 12) % 12).sort((a,b)=>a-b);
+                        const match = CHORD_DEFINITIONS.find(d => {
+                            const defSet = new Set(d.intervals);
+                            if (defSet.size !== intervals.length) return false;
+                            return intervals.every(i => defSet.has(i));
+                        });
+                        if (match) {
+                            const rootName = getNoteNameByIndex(r);
+                            const isSlash = r !== bassIdx;
+                            const name = rootName; 
+                            const iMap = {};
+                            notes.forEach(n => iMap[n.strIdx] = INTERVAL_NAMES[(n.noteIdx - r + 12) % 12]);
+                            const res = { name, rootIdx: r, suffix: match.name, slashBassIdx: isSlash ? bassIdx : null, intervalMap: iMap, intervals: match.intervals };
+                            if (!bestMatch) bestMatch = res;
+                            if (!isSlash) { bestMatch = res; break; }
+                        }
+                    }
+
+                    if (!bestMatch) {
+                        const intervals = pitches.map(p => (p - bassIdx + 12) % 12).sort((a,b)=>a-b);
+                        const iNames = intervals.map(i => INTERVAL_NAMES[i]);
+                        const iMap = {};
+                        notes.forEach(n => iMap[n.strIdx] = INTERVAL_NAMES[(n.noteIdx - bassIdx + 12) % 12]);
+                        setAnalyzedChordData({ name: "Unknown", rootIdx: bassIdx, suffix: null, slashBassIdx: null, intervalMap: iMap, intervals, details: `Int: ${iNames.join('-')}` });
+                    } else {
+                        setAnalyzedChordData(bestMatch);
+                    }
+                }
+            }, [chordMarkers, currentTuning, currentNoteNames]);
+
+            const sortedTuningKeys = ['Standard', ...Object.keys(INSTRUMENTS[currentInstrument].tunings).filter(k => k !== 'Standard').sort()];
+
+            const theme = {
+                bg: isDarkMode ? 'bg-slate-900' : 'bg-gray-100',
+                text: isDarkMode ? 'text-slate-100' : 'text-gray-800',
+                panelBg: isDarkMode ? 'bg-slate-800/90' : 'bg-white/90',
+                panelBorder: isDarkMode ? 'border-slate-700' : 'border-gray-200',
+                inputBg: isDarkMode ? 'bg-slate-800' : 'bg-white',
+                inputBorder: isDarkMode ? 'border-slate-600' : 'border-gray-300',
+                cardBg: isDarkMode ? 'bg-slate-800' : 'bg-white',
+                fretboardBg: isDarkMode ? 'bg-[#2a2a2e]' : 'bg-white',
+                fretboardBorder: isDarkMode ? 'border-[#1a1a1c]' : 'border-slate-300',
+                fretColor: isDarkMode ? 'bg-[#888]' : 'bg-slate-300',
+                markerColor: isDarkMode ? 'bg-gray-600' : 'bg-slate-800',
+                stringColor: isDarkMode ? '#c0c0c0' : '#555',
+            };
+
+            return (
+                <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans transition-colors duration-300 pb-20`}>
+                    {/* Header */}
+                    <div className={`sticky top-0 z-[100] ${theme.panelBg} backdrop-blur-md border-b ${theme.panelBorder} shadow-lg p-4`}>
+                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                            <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+                                <span className="text-2xl filter drop-shadow-sm select-none">🗣️</span>
+                                <span className={`bg-gradient-to-r ${isDarkMode ? 'from-gray-200 to-red-500' : 'from-black to-red-600'} bg-clip-text text-transparent`}>
+                                    Let's-a-guitarrr
+                                </span>
+                                <span className="text-2xl filter drop-shadow-sm select-none">💀</span>
+                            </h1>
+                            <div className="flex flex-wrap gap-2 justify-center items-center relative">
+                                <button onClick={() => setShowHelp(true)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10" title="Help"><HelpCircleIcon size={20}/></button>
+
+                                <div className="relative">
+                                    <button onClick={() => setShowMetronomeSettings(!showMetronomeSettings)}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full border mr-2 transition-all duration-75 ${isMetronomePlaying ? 'bg-red-500/10 text-red-500 border-red-500/50' : 'border-slate-300 dark:border-slate-600 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                    >
+                                        <ActivityIcon size={16} className={`${isMetronomePlaying ? 'animate-pulse' : ''}`} />
+                                        {isMetronomePlaying && <span className="text-xs font-bold font-mono w-8 text-center">{bpm}</span>}
+                                    </button>
+                                    
+                                    {showMetronomeSettings && (
+                                        <div className={`absolute top-full right-0 mt-2 p-4 rounded-xl border shadow-xl z-[110] w-72 bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600`}>
+                                            <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold flex items-center gap-2"><ActivityIcon size={16}/> Metronome</h3><button onClick={() => setShowMetronomeSettings(false)}><XIcon/></button></div>
+                                            <div className="flex items-center justify-between mb-4 bg-black/5 dark:bg-white/5 p-2 rounded-lg">
+                                                <button onClick={toggleMetronome} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isMetronomePlaying ? 'bg-red-500 shadow-lg text-white' : 'bg-green-500 shadow-md text-white'}`}>{isMetronomePlaying ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}</button>
+                                                <div className={`w-4 h-4 rounded-full transition-all duration-75 ${visualBeat === 'accent' ? 'bg-red-600 shadow-[0_0_15px_red] scale-125' : visualBeat === 'beat' ? 'bg-yellow-400 shadow-[0_0_10px_yellow]' : 'bg-slate-500 opacity-20'}`}></div>
+                                            </div>
+                                            <div className="mb-4">
+                                                <label className="text-[10px] font-bold opacity-60 mb-1 block">SUBDIVISION</label>
+                                                <div className="flex gap-1 mb-2">
+                                                    {[{ val: 0.25, label: '𝅝' }, { val: 1, label: '♩' }, { val: 2, label: '♪' }, { val: 4, label: '♬' }].map(sub => (
+                                                    <button key={sub.val} onClick={() => setBaseSubdivision(sub.val)} className={`flex-1 py-1 text-sm font-bold rounded border transition-colors ${baseSubdivision === sub.val ? 'bg-green-600 text-white border-green-600' : 'border-transparent hover:bg-black/5 dark:hover:bg-white/5'}`}>{sub.label}</button>
+                                                    ))}
+                                                </div>
+                                                <button onClick={() => setIsTriplet(!isTriplet)} className={`w-full py-1 text-sm font-serif rounded border transition-colors flex items-center justify-center gap-2 ${isTriplet ? 'bg-purple-600 text-white border-purple-600' : 'border-slate-300 dark:border-slate-600 hover:bg-black/5 dark:hover:bg-white/5'}`}>┌ 3 ┐</button>
+                                            </div>
+                                            <div>
+                                                <div className="flex justify-between items-center mb-2">
+                                                        <div className="text-center"><span className="text-5xl font-black font-mono tracking-tighter text-blue-600 dark:text-blue-400">{bpm}</span><span className="text-sm font-bold opacity-50 ml-1">BPM</span></div>
+                                                        <button onClick={handleTapTempo} className="px-3 py-2 rounded bg-slate-100 dark:bg-slate-700 text-xs font-bold border border-slate-300 dark:border-slate-600 hover:bg-blue-500 hover:text-white transition-colors active:scale-95"><HandIcon size={14} className="inline mr-1"/>TAP</button>
+                                                </div>
+                                                <input type="range" min="30" max="240" value={bpm} onChange={(e) => adjustBpm(parseInt(e.target.value))} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-600 mb-2 accent-blue-500" />
+                                                <div className="flex justify-between mt-2"><button onClick={() => adjustBpm(bpm - 1)} className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5"><Minus size={16} /></button><button onClick={() => adjustBpm(bpm + 1)} className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5"><Plus size={16} /></button></div>
+                                            </div>
+                                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                <label className="text-[10px] font-bold opacity-60 mb-1 block">BEATS PER BAR (COUNT)</label>
+                                                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 p-2 rounded-lg">
+                                                <input type="number" min="1" max="16" value={customNum} onChange={(e) => updateCustomTimeSig(parseInt(e.target.value), 4)} className="w-full bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-500 rounded px-2 py-1 text-center font-bold outline-none" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <button onClick={toggleInstrument} className={`flex items-center gap-1 px-3 py-1.5 rounded-full border transition-all ${theme.inputBorder} ${theme.inputBg} hover:bg-gray-100 dark:hover:bg-slate-700`} title="Switch Instrument"><span className="text-lg">🎸</span><span className="text-xs font-bold">{currentInstrument === 'Guitar' ? 'G' : 'B'}</span></button>
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${theme.inputBorder} ${theme.inputBg}`}><SlidersIcon size={14} className="opacity-50" /><select value={tuningName} onChange={(e) => handleTuningPresetChange(e.target.value)} className={`bg-transparent text-xs font-bold focus:outline-none max-w-[80px] ${isDarkMode ? 'text-white' : 'text-gray-900'} [&>option]:text-black`}>{sortedTuningKeys.map(t => <option key={t} value={t}>{t}</option>)}<option value="Custom">Custom</option></select></div>
+                                <button onClick={() => setDisplayMode(prev => prev === 'note' ? 'interval' : 'note')} className={`p-2 rounded-full transition-all ${isDarkMode ? 'bg-slate-700' : 'bg-gray-200'}`}>{displayMode === 'note' ? <HashIcon size={18}/> : <TypeIcon size={18}/>}</button>
+                                <button onClick={() => setIsMonochrome(!isMonochrome)} className={`p-2 rounded-full transition-all ${isMonochrome ? 'bg-blue-500 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}><PaletteIcon size={18}/></button>
+                                <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-gray-200'}`}>{isDarkMode ? <SunIcon size={18} className="text-yellow-300" /> : <MoonIcon size={18} className="text-slate-600" />}</button>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 mb-4 mt-4 justify-center">
+                            {['scale', 'chord', 'theory', 'tuner'].map(t => (
+                                <button key={t} onClick={() => setActiveTab(t)} className={`flex-1 max-w-[150px] py-2 rounded-lg font-bold text-sm transition-all capitalize ${activeTab === t ? (t === 'tuner' ? 'bg-red-600 text-white shadow-lg' : t === 'theory' ? 'bg-emerald-600 text-white' : t === 'metronome' ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white') : `${theme.inputBg} border ${theme.inputBorder} opacity-70`}`}>{t === 'chord' ? 'Chords Analyse' : t === 'theory' ? 'Theory for dummies' : t}</button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="max-w-7xl mx-auto p-4 mt-6">
+                        {activeTab === 'scale' && (
+                            <>
+                                <div className="flex flex-wrap gap-2 justify-center mb-6 animate-in fade-in sticky top-[140px] z-40 py-2 backdrop-blur-sm bg-transparent rounded-lg">
+                                    {SCALES[scaleType].intervals.map((idx) => {
+                                        const inv = INTERVAL_NAMES[idx];
+                                        const isFocused = focusIntervals.has('All') || focusIntervals.has(inv);
+                                        const isDehighlighted = !isFocused && !focusIntervals.has('All');
+
+                                        return (
+                                            <div key={inv} onClick={() => toggleFocusInterval(inv)} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer hover:scale-105 transition-transform ${isDehighlighted ? 'opacity-30 grayscale' : 'opacity-100'} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700`}>
+                                                <div className={`w-3 h-3 rounded-full ${INTERVAL_COLORS[inv].split(' ')[0]}`}></div>
+                                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{inv}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-in fade-in slide-in-from-top-2">
+                                    <div className={`p-4 rounded-xl border ${theme.cardBg} ${theme.panelBorder}`}>
+                                        <label className="text-[10px] font-bold opacity-50 block mb-2">KEY & SCALE</label>
+                                        <div className="flex gap-2">
+                                            <select value={rootNote} onChange={(e) => setRootNote(e.target.value)} className={`bg-transparent font-bold outline-none text-xl ${theme.text} ${isDarkMode ? '[&>option]:bg-slate-800' : '[&>option]:bg-white'}`}>
+                                                {NOTES_SHARP.map(n => <option key={n} value={n}>{n}</option>)}
+                                            </select>
+                                            <select value={scaleType} onChange={(e) => setScaleType(e.target.value)} className={`bg-transparent font-bold outline-none text-sm flex-1 ${theme.text} ${isDarkMode ? '[&>option]:bg-slate-800' : '[&>option]:bg-white'}`}>
+                                                {Object.keys(SCALES).map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className={`md:col-span-2 p-4 rounded-xl border ${theme.cardBg} ${theme.panelBorder}`}>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <label className="text-[10px] font-bold opacity-50">INTERVAL FOCUS</label>
+                                            <div className="flex gap-2">
+                                                <button onClick={resetView} className="text-[10px] flex items-center gap-1 text-blue-500 hover:text-blue-400 mr-2"><RotateCcwIcon size={12}/> Reset All</button>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1 overflow-x-auto pb-2 custom-scrollbar">
+                                            <button onClick={() => toggleFocusInterval('All')} className={`px-3 py-1 rounded text-xs font-bold transition-all ${focusIntervals.has('All') ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700 opacity-50'}`}>ALL</button>
+                                            {SCALES[scaleType].intervals.map((idx) => {
+                                                const inv = INTERVAL_NAMES[idx];
+                                                const active = focusIntervals.has(inv);
+                                                return (
+                                                    <button key={inv} onClick={() => toggleFocusInterval(inv)} className={`px-3 py-1 rounded text-xs font-bold border transition-all ${active ? `${INTERVAL_COLORS[inv]} border-transparent` : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 opacity-40'}`}>
+                                                        {inv}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {activeTab === 'tuner' && (
+                            <div className="flex flex-col items-center justify-center py-10 animate-in zoom-in-95">
+                                <div className="w-80 h-80 rounded-full border-8 border-slate-200 dark:border-slate-800 relative flex flex-col items-center justify-center bg-white dark:bg-slate-900 shadow-2xl">
+                                    {!tunerData.active ? (
+                                        <button onClick={startTuner} className="flex flex-col items-center gap-4 hover:scale-110 transition-transform">
+                                            <div className="p-6 rounded-full bg-blue-500/10 text-blue-500"><MicIcon size={48} /></div>
+                                            <span className="font-bold text-xl">Start Tuner</span>
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <span className="text-8xl font-black mb-2">{tunerData.note}</span>
+                                            <span className="text-blue-500 font-mono text-xl">{tunerData.freq} Hz</span>
+                                            {/* Needle */}
+                                            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                                                <div 
+                                                    className={`absolute top-1/2 left-1/2 w-1.5 h-32 origin-bottom -translate-x-1/2 -translate-y-full rounded-full tuner-needle ${Math.abs(tunerData.cents) < 5 ? 'bg-green-500 shadow-[0_0_20px_green]' : 'bg-red-500'}`}
+                                                    style={{ transform: `translateX(-50%) translateY(-100%) rotate(${tunerData.cents * 0.9}deg)` }}
+                                                ></div>
+                                            </div>
+                                            <div className="mt-24 text-sm font-mono opacity-50">{tunerData.cents > 0 ? `+${tunerData.cents}` : tunerData.cents} cents</div>
+                                        </>
+                                    )}
+                                </div>
+                                <p className="mt-8 opacity-50 text-sm italic">기타 줄을 튕겨주세요. 중앙 초록색에 가까울수록 정확합니다.</p>
+                            </div>
+                        )}
+
+                        {activeTab === 'chord' && (
+                            <>
+                            {/* Detected Chord Panel */}
+                            <div className="mb-6 p-4 rounded-xl bg-purple-900/10 border border-purple-500/30 flex justify-between items-center animate-in fade-in sticky top-[140px] z-40 backdrop-blur-md">
+                                <div className="flex-1">
+                                    <h3 className="text-xs font-bold text-purple-500 mb-1">DETECTED CHORD</h3>
+                                    <div className="text-2xl font-black tracking-wide text-purple-600 dark:text-purple-300">
+                                        {analyzedChordData ? (analyzedChordData.name === "Unknown" ? 
+                                            <span className="text-base opacity-70 font-mono">{analyzedChordData.details}</span> : 
+                                            analyzedChordData.name + (analyzedChordData.suffix || '') + ((analyzedChordData.slashBassIdx !== null && analyzedChordData.slashBassIdx !== undefined) ? '/' + getNoteNameByIndex(analyzedChordData.slashBassIdx) : '')
+                                        ) : "Select notes..."}
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2 shrink-0">
+                                    {analyzedChordData && ACCIDENTAL_INDICES.includes(analyzedChordData.rootIdx) && (
+                                        <button onClick={() => setForceFlat(!forceFlat)} className="px-3 py-1 rounded border border-purple-500/50 text-xs font-bold hover:bg-purple-500 hover:text-white transition-colors">{forceFlat ? '♭' : '♯'}</button>
+                                    )}
+                                    <button onClick={() => {setChordMarkers({}); setAnalyzedChordData(null);}} className="p-2 rounded bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors"><XIcon/></button>
+                                </div>
+                            </div>
+
+                            {/* Legend for Chord Mode */}
+                            <div className="flex flex-wrap gap-2 justify-center mb-4 animate-in fade-in py-2 bg-transparent rounded-lg">
+                                {INTERVAL_NAMES.map(inv => {
+                                    const isHighlighted = highlightedInterval === inv;
+                                    const isActiveInChord = analyzedChordData?.intervals.map(i => INTERVAL_NAMES[i]).includes(inv);
+                                    const styleClass = isActiveInChord ? 'opacity-100 border-transparent' : 'opacity-30 grayscale border-slate-200 dark:border-slate-700';
+                                    const bgClass = 'bg-white dark:bg-slate-800';
+
+                                    return (
+                                            <div 
+                                            key={inv} 
+                                            className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-default transition-all ${styleClass} ${bgClass}`}
+                                        >
+                                            <div className={`w-3 h-3 rounded-full ${INTERVAL_COLORS[inv].split(' ')[0]}`}></div>
+                                            <span className={`text-xs font-bold ${isActiveInChord ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'}`}>{inv}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                            </>
+                        )}
+
+                        {activeTab === 'theory' && (
+                            <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                                <section className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center mb-12">
+                                    <div className="flex justify-center relative">
+                                        <div className={`relative w-[300px] h-[300px] rounded-full border-4 ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'} shadow-2xl flex items-center justify-center`}>
+                                            <div className="absolute z-10 text-center pointer-events-none">
+                                                <div className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">Key of</div>
+                                                <div className={`text-4xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{rootNote}</div>
+                                            </div>
+                                            {CIRCLE_OF_FIFTHS.map((item, i) => {
+                                                const angle = (i * 30) - 90;
+                                                const radius = 110;
+                                                const x = Math.cos((angle * Math.PI) / 180) * radius;
+                                                const y = Math.sin((angle * Math.PI) / 180) * radius;
+                                                const isCurrent = (item.idx === ROOT_TO_INDEX[rootNote]);
+                                                return (
+                                                    <React.Fragment key={item.note}>
+                                                        <button onClick={() => setRootNote(item.note)} className={`absolute w-10 h-10 rounded-full flex flex-col items-center justify-center transition-all cursor-pointer group ${isCurrent ? 'bg-blue-500 text-white shadow-lg scale-125 z-20 border-2 border-white' : `${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600'} hover:scale-110 z-10`}`} style={{ transform: `translate(${x}px, ${y}px)` }}>
+                                                            <span className="font-bold text-xs">{item.display || item.note}</span>
+                                                        </button>
+                                                        <div className={`absolute text-[10px] font-medium opacity-50 pointer-events-none ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`} style={{ transform: `translate(${x * 0.65}px, ${y * 0.65}px)` }}>{item.minor}</div>
+                                                    </React.Fragment>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div className={`p-6 rounded-xl border ${theme.cardBg} ${theme.panelBorder} h-full flex flex-col justify-center`}>
+                                        <h3 className="text-xl font-bold text-orange-500 mb-4 flex items-center gap-2"><GraduationCapIcon size={20}/> How to Use Circle of Fifths</h3>
+                                        <div className={`space-y-4 text-sm leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+                                            <p><strong>시계 방향 (5도 상행):</strong> 샵(#)이 하나씩 늘어납니다. 밝고 힘찬 진행.</p>
+                                            <p><strong>반시계 방향 (4도 상행):</strong> 플랫(b)이 하나씩 늘어납니다. 부드러운 진행.</p>
+                                            <p><strong>안쪽 원 (나란한 조):</strong> 같은 조표를 공유하는 마이너 키입니다.</p>
+                                            <div className="bg-blue-500/10 p-3 rounded-lg border border-blue-500/20 mt-2"><strong className="text-blue-400">💡 Tip:</strong> 양 옆의 키 코드를 빌려오면 자연스럽습니다.</div>
+                                        </div>
+                                        <div className="mt-4 pt-4 border-t border-gray-700">
+                                            <h4 className="text-xs font-bold opacity-70 mb-2 uppercase">{rootNote} Major Scale</h4>
+                                            <div className="flex justify-between items-center gap-1">
+                                                {[0, 2, 4, 5, 7, 9, 11].map((interval, i) => {
+                                                    const noteIdx = (ROOT_TO_INDEX[rootNote] + interval) % 12;
+                                                    const degrees = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+                                                    return (
+                                                        <div key={i} className="flex flex-col items-center flex-1">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mb-1 ${i===0?'bg-blue-500 text-white':(isDarkMode?'bg-slate-700':'bg-gray-100')}`}>{currentNoteNames[noteIdx]}</div>
+                                                            <span className="text-[10px] opacity-50">{degrees[i]}</span>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                                
+                                {/* Theory Grids */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className={`p-6 rounded-xl border ${theme.cardBg} ${theme.panelBorder}`}>
+                                        <h3 className="text-lg font-bold text-blue-500 mb-4 flex items-center gap-2"><HashIcon size={18}/> Intervals</h3>
+                                        <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                                            {ORDERED_INTERVAL_KEYS.map((inv) => (
+                                                <div key={inv} className="flex items-start gap-3 p-2 rounded hover:bg-black/5 dark:hover:bg-white/5">
+                                                    <span className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-xs ${INTERVAL_COLORS[inv]}`}>{inv}</span>
+                                                    <p className="text-xs opacity-80 leading-snug pt-1">{INTERVAL_DESC[inv]}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className={`p-6 rounded-xl border ${theme.cardBg} ${theme.panelBorder}`}>
+                                        <h3 className="text-lg font-bold text-purple-500 mb-4 flex items-center gap-2"><Music2Icon size={18}/> Chord Formulas</h3>
+                                        <div className="space-y-3">
+                                            {CHORD_LOGIC.map(c => (
+                                                <div key={c.name} className="p-3 rounded bg-slate-100 dark:bg-slate-800 border-l-4 border-purple-500">
+                                                    <div className="flex justify-between mb-1">
+                                                        <span className="font-bold text-sm">{c.name}</span>
+                                                        <div className="flex gap-1">{c.formula.map(f => <span key={f} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-300 dark:bg-slate-600 font-bold">{INTERVAL_NAMES[f]}</span>)}</div>
+                                                    </div>
+                                                    <p className="text-xs opacity-60">{c.desc}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className={`p-6 rounded-xl border ${theme.cardBg} ${theme.panelBorder}`}>
+                                        <h3 className="text-lg font-bold text-green-500 mb-4 flex items-center gap-2"><BookOpenIcon size={18}/> Progressions</h3>
+                                        <div className="space-y-3">
+                                            {[
+                                                {t:'Pop Money Code (1-5-6-4)', c:'I - V - vi - IV', d:'수천 곡의 히트곡이 쓴 머니코드.'},
+                                                {t:'Canon (Pachelbel)', c:'I - V - vi - iii - IV - I', d:'캐논 변주곡. 클래식하고 감동적.'},
+                                                {t:'Royal Road (4-5-3-6)', c:'IV - V - iii - vi', d:'한국/일본 대중음악의 왕도 진행.'},
+                                                {t:'Jazz Standard (2-5-1)', c:'ii - V7 - Imaj7', d:'재즈의 가장 기본이 되는 마침표.'},
+                                                {t:'Andalusian', c:'i - bVII - bVI - V', d:'스페인 플라멩코 느낌의 하행 진행.'}
+                                            ].map(p => (
+                                                <div key={p.t} className="p-3 rounded bg-slate-100 dark:bg-slate-800 border-l-4 border-green-500">
+                                                    <div className="font-bold text-sm mb-1">{p.t}</div>
+                                                    <div className="font-mono text-xs font-bold text-green-600 dark:text-green-400 mb-1">{p.c}</div>
+                                                    <p className="text-xs opacity-60">{p.d}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Fretboard Rendering (Hidden in Tuner/Theory) */}
+                        {['scale', 'chord'].includes(activeTab) && (
+                            <div className="relative overflow-x-auto py-10 custom-scrollbar select-none pl-[60px]"> 
+                                <div 
+                                    className={`relative mx-auto rounded-lg border-4 ${theme.fretboardBorder} ${theme.fretboardBg} shadow-2xl transition-colors duration-300`}
+                                    style={{ width: 12 * 60 + 160, height: INSTRUMENTS[currentInstrument].fretboardHeight }}
+                                >
+                                    {/* Nut - Shifted left by 8px to not eat into fret 1 space */}
+                                    <div className={`absolute top-0 bottom-0 w-2 shadow-md z-10 ${isDarkMode ? 'bg-slate-400' : 'bg-slate-300'}`} style={{ left: NUT_POS_X - 8 }}></div>
+                                    
+                                    {/* Left Side: Tuning Controls & Open Strings (Moved to fixed left position) */}
+                                    {INSTRUMENTS[currentInstrument].strings.map((s, i) => {
+                                        const openNoteIdx = currentTuning[i];
+                                        const openNoteName = getNoteNameByIndex(openNoteIdx);
+                                        const rootIdx = ROOT_TO_INDEX[rootNote];
+                                        const intervalIdx = (openNoteIdx - rootIdx + 12) % 12;
+                                        const intervalName = INTERVAL_NAMES[intervalIdx];
+                                        const isScaleNote = SCALES[scaleType].intervals.includes(intervalIdx);
+                                        const isFocused = focusIntervals.has('All') || focusIntervals.has(intervalName);
+                                        
+                                        let openStringDisplay = null;
+                                        
+                                        // 기본 스케일 모드용 클래스
+                                        const scaleCircleClass = `w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg transition-all z-20 ${INTERVAL_COLORS[intervalName]} ${isMonochrome ? MONO_COLORS[intervalName==='R'?'R':'default'] : ''}`;
+
+                                        if (activeTab === 'scale') {
+                                            if (isScaleNote && isFocused) {
+                                                    const isHidden = hiddenNoteIndices.has(`${i}-0`);
+                                                    openStringDisplay = (
+                                                        <div className={`${scaleCircleClass} ${isHidden ? 'opacity-20 grayscale' : 'opacity-100'}`} onClick={() => toggleNoteVisibility(i, 0)}>
+                                                            {displayMode === 'note' ? openNoteName : intervalName}
+                                                        </div>
+                                                    )
+                                            }
+                                        } else if (activeTab === 'chord') {
+                                                const isMarked = chordMarkers[i] === 0; // Fret 0
+                                                
+                                                if (isMarked) {
+                                                    // [버그 수정] 분석된 코드의 인터벌 색상을 우선 적용
+                                                    const chordInterval = analyzedChordData?.intervalMap[i];
+                                                    const colorClass = chordInterval ? INTERVAL_COLORS[chordInterval] : 'bg-purple-500 text-white';
+                                                    
+                                                    openStringDisplay = (
+                                                        <div onClick={() => toggleChordMarker(i, 0)} className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg transition-all z-20 cursor-pointer opacity-100 ${colorClass}`}>
+                                                            {displayMode === 'note' ? openNoteName : (chordInterval || intervalName)}
+                                                        </div>
+                                                    )
+                                                } else {
+                                                    // Ghost circle
+                                                    openStringDisplay = (
+                                                        <div onClick={() => toggleChordMarker(i, 0)} className="w-8 h-8 rounded-full border-2 border-slate-400/20 dark:border-white/10 hover:bg-slate-400/20 dark:hover:bg-white/20 transition-colors cursor-pointer flex items-center justify-center">
+                                                            <span className="text-[10px] opacity-50">{openNoteName}</span>
+                                                        </div>
+                                                    )
+                                                }
+                                        }
+
+                                        return (
+                                            <div key={`tuning-${i}`} className="absolute z-20 flex items-center gap-2" style={{ left: 10, top: STRING_START_TOP + (i * INSTRUMENTS[currentInstrument].stringSpacing) - 15 }}>
+                                                {/* String Number & Tuning Note */}
+                                                <div className="w-8 text-center font-bold text-xs opacity-60 flex flex-col items-center leading-none">
+                                                    <span>{i + 1}</span>
+                                                    <span className="text-[10px]">({openNoteName})</span>
+                                                </div>
+                                                {/* Tuning Arrows */}
+                                                <div className="flex flex-col items-center">
+                                                    <button onClick={() => adjustStringTuning(i, 1)} className="p-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded text-slate-500 dark:text-slate-400 hover:text-black dark:hover:text-white"><ChevronUpIcon size={12}/></button>
+                                                    <button onClick={() => adjustStringTuning(i, -1)} className="p-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded text-slate-500 dark:text-slate-400 hover:text-black dark:hover:text-white"><ChevronDownIcon size={12}/></button>
+                                                </div>
+                                                {/* Open Note Display */}
+                                                <div className="w-10 flex justify-center cursor-pointer">
+                                                    {openStringDisplay}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+
+                                    {INSTRUMENTS[currentInstrument].strings.map((s, i) => (
+                                        <div key={i} className="absolute left-0 right-0 flex items-center" style={{ top: STRING_START_TOP + (i * INSTRUMENTS[currentInstrument].stringSpacing), height: 1 + i * 0.5 + (currentInstrument==='Bass'?1:0), backgroundColor: theme.stringColor }}>
+                                            
+                                            {/* Frets & Notes - Shifted to center of fret space */}
+                                            {Array.from({ length: 12 }).map((_, fIndex) => {
+                                                const f = fIndex + 1; // 1-based fret
+                                                const { noteName, intervalName, isScaleNote } = getNoteAt(i, f);
+                                                const isFocused = focusIntervals.has('All') || focusIntervals.has(intervalName);
+                                                const isDehighlighted = !isFocused && !focusIntervals.has('All'); // For de-highlighting
+                                                
+                                                // Note position adjustment: Center of fret space
+                                                const notePosition = NUT_POS_X + (f-1)*FRET_WIDTH + 33; 
+
+                                                if (activeTab === 'scale') {
+                                                    if (!isScaleNote) return null;
+
+                                                    const isHidden = hiddenNoteIndices.has(`${i}-${f}`);
+                                                    
+                                                    // Combined style: isHidden takes precedence (user hid it), then isDehighlighted (interval focus)
+                                                    let opacityClass = 'opacity-100';
+                                                    if (isHidden) opacityClass = 'opacity-20 grayscale';
+                                                    else if (isDehighlighted) opacityClass = 'opacity-30 grayscale';
+
+                                                    return (
+                                                        <div key={f} onClick={() => toggleNoteVisibility(i, f)} className={`absolute flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-30 ${opacityClass}`} style={{ left: notePosition - 15, width: 30 }}> 
+                                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg transition-all animate-in zoom-in-50 ${INTERVAL_COLORS[intervalName]} ${isMonochrome ? MONO_COLORS[intervalName==='R'?'R':'default'] : ''}`}>
+                                                                {displayMode === 'note' ? noteName : intervalName}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                } else {
+                                                    // Chord Mode
+                                                    const isMarked = chordMarkers[i] === f;
+                                                    
+                                                    return (
+                                                        <div key={f} onClick={() => toggleChordMarker(i, f)} className={`absolute flex items-center justify-center cursor-pointer group z-30`} style={{ left: notePosition - 15, width: 30 }}>
+                                                            {isMarked ? (
+                                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg animate-in zoom-in ${analyzedChordData?.intervalMap[i] ? INTERVAL_COLORS[analyzedChordData.intervalMap[i]] : 'bg-purple-500 text-white'}`}>
+                                                                        {displayMode === 'note' ? noteName : analyzedChordData?.intervalMap[i]}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="w-8 h-8 rounded-full border-2 border-slate-400/20 dark:border-white/10 group-hover:bg-slate-400/20 dark:group-hover:bg-white/20 transition-colors"></div>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                }
+                                            })}
+                                        </div>
+                                    ))}
+                                    {/* Frets (Wires) */}
+                                    <div className="absolute inset-0 pointer-events-none">
+                                        {Array.from({ length: 13 }).map((_, i) => (
+                                            <div key={`wire-${i}`} className={`absolute top-0 bottom-0 w-[3px] ${theme.fretColor}`} style={{ left: (i * 60) + NUT_POS_X }}></div>
+                                        ))}
+                                    </div>
+                                    {/* Fret Markers */}
+                                    <div className="absolute top-[-25px] left-[100px] right-0 flex pointer-events-none">
+                                        {Array.from({ length: 12 }).map((_, f) => {
+                                                const markerCenter = NUT_POS_X + (f * FRET_WIDTH) - 65; 
+                                                return <div key={f} className={`absolute text-center text-[10px] font-mono opacity-80 font-bold ${isDarkMode ? 'text-slate-500' : 'text-slate-700'}`} style={{ left: markerCenter - 30, width: 60 }}>{f+1}</div>
+                                        })}
+                                    </div>
+                                    {/* Dot Markers */}
+                                    <div className="absolute bottom-[-20px] left-[100px] right-0 pointer-events-none">
+                                        {[3, 5, 7, 9].map(p => {
+                                            const dotPos = NUT_POS_X + ((p-1) * FRET_WIDTH) - 65; 
+                                            return <div key={p} className={`absolute w-3 h-3 rounded-full ${theme.markerColor}`} style={{ left: dotPos, transform: 'translateX(-50%)' }}></div>
+                                        })}
+                                        {[12].map(p => {
+                                            const dotPos = NUT_POS_X + ((p-1) * FRET_WIDTH) - 65; 
+                                            return (
+                                            <div key={p} className="absolute flex gap-4" style={{ left: dotPos, transform: 'translateX(-50%)' }}>
+                                                <div className={`w-3 h-3 rounded-full ${theme.markerColor}`}></div>
+                                                <div className={`w-3 h-3 rounded-full ${theme.markerColor}`}></div>
+                                            </div>
+                                        )})}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Help Modal */}
+                    {showHelp && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in" onClick={() => setShowHelp(false)}>
+                            <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl max-w-md w-full m-4" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold flex items-center gap-2"><HelpCircleIcon/> 도움말 (Quick Guide)</h2>
+                                    <button onClick={() => setShowHelp(false)} className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"><XIcon size={20}/></button>
+                                </div>
+                                <div className="space-y-4 text-sm opacity-80 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+                                    <div>
+                                        <h3 className="font-bold text-blue-500 mb-1">Scale Mode (스케일 모드)</h3>
+                                        <p>키(Key)와 스케일을 선택하여 지판 위의 노트를 확인합니다. 노트를 클릭하여 숨기거나 보일 수 있습니다. 'Interval Focus'를 사용하여 특정 도수(예: 1도, 5도)만 강조할 수 있습니다.</p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-purple-500 mb-1">Chords Analyse (코드 분석)</h3>
+                                        <p>지판을 클릭하여 노트를 배치하면 자동으로 코드 이름과 구성을 분석해줍니다. 범례의 인터벌은 현재 코드의 구성음을 나타냅니다.</p>
+                                    </div>
+                                        <div>
+                                        <h3 className="font-bold text-emerald-500 mb-1">Theory (이론)</h3>
+                                        <p>5도권(Circle of Fifths)과 인터벌, 코드 공식, 진행 등 유용한 음악 이론 정보를 확인합니다.</p>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-red-500 mb-1">Tuner (튜너)</h3>
+                                        <p>마이크를 사용하여 기타 음을 조율합니다. 바늘이 중앙 초록색에 오도록 맞추세요.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<GuitarSynapse />);
+    </script>
+</body>
+</html>
